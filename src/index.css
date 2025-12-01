@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* AGREGAR ESTO AL FINAL DEL ARCHIVO */
+
+:root {
+  /* Esto le dice al navegador que el sitio es oscuro, 
+     por lo que la barra de scroll será oscura por defecto */
+  color-scheme: dark;
+}
+
+html {
+  /* Esta es la magia: 'stable' reserva el espacio del scroll siempre.
+     Así, cuando el scroll desaparece, el contenido no se mueve. */
+  scrollbar-gutter: stable;
+  
+  /* Aseguramos que el fondo del canal del scroll sea del color de la página */
+  background-color: black;
+}
+
+/* Opcional: Personalizar la barra de scroll para que combine mejor (estilo Chrome/Safari/Edge) */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111827; /* gray-900 */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151; /* gray-700 */
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563; /* gray-600 */
+}
