@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from './components/layout/Header';
 import { MobileMenu } from './components/layout/MobileMenu';
 import { LoginForm } from './components/auth/LoginForm';
@@ -19,7 +19,7 @@ import { PublicCollection } from './components/collection/PublicCollection';
 import { useAuth } from './hooks/useAuth';
 import { useCart } from './hooks/useCart';
 import { useCollection } from './hooks/useCollection';
-import { mockCards, mockListings } from './data/mockData';
+import { mockCards } from './data/mockData';
 import { Card, MarketplaceListing, CartItem, User } from './types';
 import { ConfirmationModal } from './components/ui/ConfirmationModal';
 import { useNotification } from './hooks/useNotification';
@@ -29,7 +29,7 @@ type AuthView = 'login' | 'register' | 'forgot-password';
 
 function App() {
   const { isAuthenticated, user } = useAuth();
-  const { addToCart } = useCart();
+  const { addToCart, clearCart } = useCart();
   const collection = useCollection(user?.id);
   const { addNotification } = useNotification();
   
@@ -68,15 +68,66 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   
+  // ----------------------------------------------------
+  // CARGA DEL CATÁLOGO DESDE API con Fallback
+  // ----------------------------------------------------
   const [catalogCards, setCatalogCards] = useState<Card[]>(() => {
     const saved = localStorage.getItem('catalogCards');
     return saved ? JSON.parse(saved) : mockCards;
   });
 
+  useEffect(() => {
+    const fetchCatalog = async () => {
+        try {
+            const res = await fetch('/api/v1/cards/catalog');
+            if (res.ok) {
+                const data = await res.json();
+                setCatalogCards(data); 
+            } else {
+                console.error("Failed to fetch catalog from API. Using local mocks.");
+            }
+        } catch (error) {
+            console.warn("Could not connect to backend for catalog. Using local mock data.", error);
+        }
+    };
+    fetchCatalog();
+  }, []); 
+
+  useEffect(() => {
+    localStorage.setItem('catalogCards', JSON.stringify(catalogCards));
+  }, [catalogCards]);
+  // ----------------------------------------------------
+  
+  // ----------------------------------------------------
+  // CARGA DE MARKETPLACE LISTINGS DESDE API con Fallback
+  // ----------------------------------------------------
   const [marketplaceListings, setMarketplaceListings] = useState<MarketplaceListing[]>(() => {
     const saved = localStorage.getItem('marketplaceListings');
-    return saved ? JSON.parse(saved) : mockListings;
+    return saved ? JSON.parse(saved) : []; 
   });
+
+  useEffect(() => {
+    const fetchListings = async () => {
+        try {
+            const res = await fetch('/api/v1/marketplace/listings');
+            if (res.ok) {
+                const data = await res.json();
+                setMarketplaceListings(data); 
+            } else {
+                console.error("Failed to fetch listings from API. Using local mocks.");
+            }
+        } catch (error) {
+            console.warn("Could not connect to backend for listings. Using local data.", error);
+        }
+    };
+    fetchListings();
+  }, []); 
+  
+  useEffect(() => {
+    localStorage.setItem('marketplaceListings', JSON.stringify(marketplaceListings));
+  }, [marketplaceListings]);
+  // ----------------------------------------------------
+
 
   const [availableSets, setAvailableSets] = useState<string[]>(() => {
     const saved = localStorage.getItem('availableSets');
@@ -93,14 +144,6 @@ function App() {
   const [selectedType, setSelectedType] = useState('Todos');
   const [selectedSet, setSelectedSet] = useState('Todos');
   const [selectedCondition, setSelectedCondition] = useState('Todas');
-
-  useEffect(() => {
-    localStorage.setItem('catalogCards', JSON.stringify(catalogCards));
-  }, [catalogCards]);
-
-  useEffect(() => {
-    localStorage.setItem('marketplaceListings', JSON.stringify(marketplaceListings));
-  }, [marketplaceListings]);
 
   useEffect(() => {
     localStorage.setItem('availableSets', JSON.stringify(availableSets));
@@ -197,32 +240,64 @@ function App() {
       }
     );
   };
-
-  const handleCheckoutSuccess = (purchasedItems: CartItem[]) => {
-    if (purchasedItems.length === 0) {
+  
+  // ----------------------------------------------------
+  // LÓGICA DE CHECKOUT CENTRALIZADA (MODIFICADA)
+  // ----------------------------------------------------
+  const handleCheckoutSuccess = async (purchasedItems: CartItem[]) => {
+    if (purchasedItems.length === 0 || !user) {
       setCurrentView('catalog');
       return;
     }
-    purchasedItems.forEach(cartItem => {
-      for (let i = 0; i < cartItem.quantity; i++) {
-        collection.addToCollection(cartItem.card, cartItem.source);
-      }
-    });
-    const boughtListingIds: string[] = [];
-    const remainingListings = marketplaceListings.filter(listing => {
-      const wasBought = purchasedItems.some(item => item.card.id === listing.card.id);
-      if (wasBought) {
-        addNotification(listing.seller.id, `¡Tu carta "${listing.card.name}" ha sido vendida!`);
-        boughtListingIds.push(listing.id);
-        return false; 
-      }
-      return true; 
-    });
-    if (boughtListingIds.length > 0) {
-      setMarketplaceListings(remainingListings);
+    
+    const API_URL = '/api/v1/marketplace/checkout';
+    const checkoutPayload = {
+      userId: user.id, 
+      purchasedItems: purchasedItems
+    };
+
+    try {
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(checkoutPayload),
+        });
+
+        if (res.ok) { // 200 OK
+            const data = await res.json();
+            
+            // 1. SINCRONIZACIÓN CENTRALIZADA: 
+            // El Backend ya gestionó la transferencia y eliminó los listings.
+            setMarketplaceListings(data.remainingListings);
+            
+            // 2. Notificar al Vendedor (Notificación local de Front-end)
+            purchasedItems.forEach(cartItem => {
+                const listing = marketplaceListings.find(l => l.card.id === cartItem.card.id);
+                if (listing) {
+                    addNotification(listing.seller.id, `¡Tu carta "${listing.card.name}" ha sido vendida!`);
+                }
+            });
+
+            // 3. Limpiamos el carrito local (porque la transacción fue confirmada)
+            clearCart();
+            
+            // 4. Forzamos la actualización de la colección local (esto solo fuerza el useEffect)
+            collection.syncCollectionWithCatalog(catalogCards); 
+
+        } else {
+            console.error("Checkout failed on backend.", res.status);
+            alert("Error: El servidor falló al completar la transacción.");
+        }
+
+    } catch (error) {
+        console.error("Network error during checkout:", error);
+        alert("Error de red: no se pudo conectar al servidor para finalizar la compra.");
     }
+    
     setCurrentView('catalog');
   };
+  // ----------------------------------------------------
+
 
   const filteredCards = catalogCards.filter(card => {
     const matchesSearch = card.name.toLowerCase().includes(searchTerm.toLowerCase());

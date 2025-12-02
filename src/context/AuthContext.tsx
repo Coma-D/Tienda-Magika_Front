@@ -84,86 +84,144 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // --- FUNCIÓN LOGIN (YA MODIFICADA) ---
   const login = async (emailOrUsername: string, password: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // --- LOGIN ADMIN (ID = '1') ---
-        if (emailOrUsername === 'admin' && password === 'admin') {
-          const adminUser: User = {
-            id: ADMIN_ID, // Usamos '1'
-            name: 'Administrador',
-            username: 'admin',
-            email: 'admin@tiendamagika.com',
-            avatar: '', 
-            isOnline: true,
-            password: 'admin'
-          };
-          setUser(adminUser);
-          setIsAuthenticated(true);
-          localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminUser));
-          resolve(true);
-          return;
-        }
+    const API_URL = '/api/v1/auth/login';
+    const loginPayload = { emailOrUsername, password };
 
-        const allUsers = getAllUsers();
-        const foundUserIndex = allUsers.findIndex(u => 
-          (u.email === emailOrUsername || u.username === emailOrUsername) && 
-          u.password === password
-        );
+    try {
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(loginPayload),
+        });
+        
+        if (res.ok) {
+            // El backend respondió 200 OK (Credenciales válidas)
+            // const data = await res.json(); 
+            
+            // A. Login de Administrador (Validación local + estado de admin)
+            if (emailOrUsername === 'admin' && password === 'admin') {
+                const adminUser: User = {
+                    id: ADMIN_ID,
+                    name: 'Administrador',
+                    username: 'admin',
+                    email: 'admin@tiendamagika.com',
+                    avatar: '', 
+                    isOnline: true,
+                    password: 'admin'
+                };
+                setUser(adminUser);
+                setIsAuthenticated(true);
+                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(adminUser));
+                return true;
+            }
+            
+            // B. Login de Usuario Regular (Validación local + estado de usuario)
+            const allUsers = getAllUsers();
+            const foundUserIndex = allUsers.findIndex(u => 
+                (u.email === emailOrUsername || u.username === emailOrUsername) && 
+                u.password === password
+            );
 
-        if (foundUserIndex !== -1) {
-          const userWithOnline = { ...allUsers[foundUserIndex], isOnline: true };
-          allUsers[foundUserIndex] = userWithOnline;
-          saveAllUsers(allUsers);
-          
-          setUser(userWithOnline);
-          setIsAuthenticated(true);
-          localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithOnline));
-          resolve(true);
+            if (foundUserIndex !== -1) {
+                const userWithOnline = { ...allUsers[foundUserIndex], isOnline: true };
+                allUsers[foundUserIndex] = userWithOnline;
+                saveAllUsers(allUsers);
+                
+                setUser(userWithOnline);
+                setIsAuthenticated(true);
+                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithOnline));
+                return true;
+            }
+            
+            return false;
+
+        } else if (res.status === 401) {
+            // 401 Unauthorized (Credenciales inválidas, según el backend)
+            return false; 
         } else {
-          resolve(false);
+            // Otros errores del servidor (500, etc.)
+            console.error("Backend API error:", res.status);
+            return false;
         }
-      }, 1000);
-    });
+
+    } catch (error) {
+        console.error("Error de red al intentar el login:", error);
+        return false;
+    }
   };
 
+  // --- FUNCIÓN REGISTRO (MODIFICADA PARA USAR API) ---
   const register = async (name: string, username: string, email: string, password: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
+    const API_URL = '/api/v1/auth/register';
+    const registerPayload = { name, username, email, password };
+    
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registerPayload),
+      });
+
+      if (res.ok) { // 201 Created from API
+        // El API registró al usuario y nos devuelve su data (simulada)
+        const data = await res.json();
+        const newUser: User = { ...data.user, password: password }; 
+        
+        // Sincronizar localmente: añadir el nuevo usuario a localStorage
         const allUsers = getAllUsers();
-        if (allUsers.some(u => u.username.toLowerCase() === username.toLowerCase()) || username === 'admin') {
-          resolve(false); 
-          return;
-        }
-
-        const newUser: User = {
-          id: Date.now().toString(),
-          name,
-          username,
-          email,
-          avatar: '',
-          isOnline: true,
-          password
-        };
-
         saveAllUsers([...allUsers, newUser]);
+        
+        // Iniciar sesión inmediatamente con el nuevo usuario
         setUser(newUser);
         setIsAuthenticated(true);
         localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
-        resolve(true);
-      }, 1000);
-    });
+        
+        return true;
+      } else if (res.status === 409) {
+        // 409 Conflict (Usuario/email ya existe)
+        return false;
+      } else {
+        console.error("API Error during registration:", res.status);
+        return false;
+      }
+
+    } catch (error) {
+      console.error("Error de red durante el registro:", error);
+      return false;
+    }
   };
 
+  // --- FUNCIÓN CAMBIO DE CONTRASEÑA (MODIFICADA PARA USAR API) ---
   const changePassword = async (curr: string, newPass: string): Promise<{success: boolean; message: string}> => {
-    return new Promise(resolve => {
-      if (!user || (user.password && user.password !== curr)) {
-        resolve({ success: false, message: 'Contraseña actual incorrecta' });
-      } else {
+    if (!user) return { success: false, message: 'Usuario no autenticado' };
+
+    const API_URL = '/api/v1/auth/change-password';
+    const changePayload = { userId: user.id, currentPassword: curr, newPassword: newPass };
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changePayload),
+      });
+      
+      const result = await res.json(); // API devuelve { success, message }
+
+      if (res.ok) { // 200 OK
+        // Si la API dice éxito, actualizamos el estado local (sincronización)
         updateUser({ password: newPass });
-        resolve({ success: true, message: 'Actualizada' });
+        return { success: true, message: result.message };
+      } else { 
+        // 401 Unauthorized (Contraseña incorrecta) o cualquier otro error
+        return { success: false, message: result.message || 'Error al cambiar contraseña' };
       }
-    });
+
+    } catch (error) {
+      console.error("Error de red durante el cambio de contraseña:", error);
+      return { success: false, message: 'Error de red. Intenta de nuevo más tarde.' };
+    }
   };
 
   const logout = () => {

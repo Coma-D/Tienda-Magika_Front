@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { HelpCircle, Send, CheckCircle, ChevronDown, ChevronRight, Mail, MessageSquare } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { faqData } from '../../data/mockData';
+// Note: faqData import is removed as data is fetched from API
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../hooks/useNotification';
 import { ADMIN_ID } from '../../context/AuthContext';
 
 export const Support: React.FC = () => {
   const { user } = useAuth();
-  const { addNotification } = useNotification();
+  const { addNotification, fetchPersistentNotifications } = useNotification(); // Usamos la nueva función
 
   const [activeTab, setActiveTab] = useState<'faq' | 'contact'>('faq');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [faqList, setFaqList] = useState<any[]>([]); // Estado para cargar FAQ desde API
   
   const [contactForm, setContactForm] = useState({
     name: '',
@@ -23,6 +24,22 @@ export const Support: React.FC = () => {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // EFECTO: Carga de FAQ desde API
+  useEffect(() => {
+    const fetchFaq = async () => {
+        try {
+            const res = await fetch('/api/v1/support/faq');
+            if (res.ok) {
+                const data = await res.json();
+                setFaqList(data);
+            }
+        } catch (e) {
+            console.error("Failed to load FAQ from API.", e);
+        }
+    };
+    fetchFaq();
+  }, []);
 
   // EFECTO: Auto-rellenar datos del usuario al cargar
   useEffect(() => {
@@ -38,29 +55,47 @@ export const Support: React.FC = () => {
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
-    // Simular envío
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // 1. ENVIAR AL ADMINISTRADOR
-    addNotification(
-      ADMIN_ID, 
-      `Soporte: Ticket de ${contactForm.name}\nAsunto: ${contactForm.subject}\n\n${contactForm.message}`
-    );
-
-    // 2. CONFIRMACIÓN AL USUARIO
-    if (user) {
-      addNotification(
-        user.id,
-        `Sistema: Ticket Recibido\nAsunto: Recibido: ${contactForm.subject}\n\nHola ${user.name}, hemos recibido tu ticket correctamente. Un agente revisará tu mensaje:\n"${contactForm.message.substring(0, 50)}..."\n\nTe responderemos a la brevedad.`
-      );
+    
+    if (!user) {
+        alert("Debes iniciar sesión para enviar un ticket.");
+        setIsSubmitting(false);
+        return;
     }
 
-    setIsSubmitted(true);
-    setIsSubmitting(false);
+    const API_URL = '/api/v1/support/ticket';
     
-    // Limpiar formulario (mantenemos nombre/email si sigue logueado)
-    setContactForm(prev => ({ ...prev, subject: '', message: '' }));
+    // Incluimos user_id en el payload para que el Backend sepa a quién notificar.
+    const payload = {
+        ...contactForm,
+        user_id: user.id // <-- Dato clave para el registro centralizado
+    };
+
+    try {
+        const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload), 
+        });
+
+        if (res.ok || res.status === 201) { 
+            
+            // ELIMINAMOS la generación local de notificaciones y forzamos la recarga del registro centralizado
+            await fetchPersistentNotifications(); 
+
+            setIsSubmitted(true);
+            setContactForm(prev => ({ ...prev, subject: '', message: '' }));
+            
+        } else {
+            console.error("Failed to submit ticket:", res.status);
+            alert("Error al enviar el ticket. La API devolvió un error."); 
+        }
+
+    } catch (error) {
+        console.error("Network error submitting ticket:", error);
+        alert("Error de red. Asegúrate de que el backend esté activo.");
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -78,7 +113,7 @@ export const Support: React.FC = () => {
           </div>
           <h1 className="text-3xl font-bold text-white mb-3">¡Ticket enviado!</h1>
           <p className="text-gray-400 mb-8 leading-relaxed">
-            Hemos recibido tu consulta correctamente. Revisa tus notificaciones para ver la confirmación.
+            Hemos recibido tu consulta correctamente. Revisa tus **notificaciones** para ver la confirmación.
           </p>
           <Button 
             onClick={() => setIsSubmitted(false)} 
@@ -135,31 +170,35 @@ export const Support: React.FC = () => {
             </h2>
           </div>
           <div className="divide-y divide-gray-800">
-            {faqData.map((faq, index) => (
-              <div key={index} className="group">
-                <button
-                  onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
-                  className="w-full flex items-center justify-between text-left p-6 hover:bg-gray-800/50 transition-colors focus:outline-none"
-                >
-                  <span className={`text-lg font-medium transition-colors ${expandedFaq === index ? 'text-blue-400' : 'text-gray-200 group-hover:text-white'}`}>
-                    {faq.question}
-                  </span>
-                  {expandedFaq === index ? (
-                    <ChevronDown className="h-5 w-5 text-blue-500" />
-                  ) : (
-                    <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-gray-300" />
-                  )}
-                </button>
-                
-                {expandedFaq === index && (
-                  <div className="px-6 pb-6 pt-0 animate-fade-in">
-                    <div className="pl-4 border-l-2 border-blue-500/30">
-                      <p className="text-gray-400 leading-relaxed">{faq.answer}</p>
-                    </div>
+            {faqList.length === 0 ? (
+                <div className="p-6 text-center text-gray-500">Cargando preguntas frecuentes...</div>
+            ) : (
+                faqList.map((faq, index) => (
+                  <div key={index} className="group">
+                    <button
+                      onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
+                      className="w-full flex items-center justify-between text-left p-6 hover:bg-gray-800/50 transition-colors focus:outline-none"
+                    >
+                      <span className={`text-lg font-medium transition-colors ${expandedFaq === index ? 'text-blue-400' : 'text-gray-200 group-hover:text-white'}`}>
+                        {faq.question}
+                      </span>
+                      {expandedFaq === index ? (
+                        <ChevronDown className="h-5 w-5 text-blue-500" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-gray-300" />
+                      )}
+                    </button>
+                    
+                    {expandedFaq === index && (
+                      <div className="px-6 pb-6 pt-0 animate-fade-in">
+                        <div className="pl-4 border-l-2 border-blue-500/30">
+                          <p className="text-gray-400 leading-relaxed">{faq.answer}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                ))
+            )}
           </div>
         </div>
       ) : (
@@ -219,6 +258,7 @@ export const Support: React.FC = () => {
               <Button 
                 type="submit" 
                 loading={isSubmitting} 
+                disabled={!user}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 shadow-lg shadow-blue-900/20"
               >
                 <Send className="h-4 w-4 mr-2" />
