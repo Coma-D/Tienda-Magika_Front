@@ -7,6 +7,8 @@ import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { formatCLP } from '../../utils/format';
 import { RARITIES, COLORS, TYPES, t } from '../../data/constants';
+import { useAuth } from '../../hooks/useAuth'; // [CAMBIO] Import
+import { ADMIN_ID } from '../../context/AuthContext'; // [CAMBIO] Import
 
 interface CardDetailProps {
   card: Card | null;
@@ -25,12 +27,16 @@ export const CardDetail: React.FC<CardDetailProps> = ({
   card, isOpen, onClose, onAddToCart, onAddToCollection, onEditCard,
   availableSets = [], onAddSet, onDeleteSet, onDeleteCard
 }) => {
+  const { user } = useAuth(); // [CAMBIO] Hook
   const [quantity, setQuantity] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
   const [isCustomSet, setIsCustomSet] = useState(false);
   const [customSetInputValue, setCustomSetInputValue] = useState('');
   const [editData, setEditData] = useState<Card | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // [CAMBIO] Verificación de Admin
+  const isAdmin = user?.id === ADMIN_ID;
 
   useEffect(() => {
     setQuantity(1);
@@ -137,7 +143,8 @@ export const CardDetail: React.FC<CardDetailProps> = ({
               ) : (
                 <div className="flex items-center gap-2 w-full">
                   <h1 className="text-3xl font-bold text-gray-100 leading-tight truncate">{editData.name}</h1>
-                  {onEditCard && !isEditing && (
+                  {/* [CAMBIO] Botón de editar condicionado a isAdmin */}
+                  {onEditCard && !isEditing && isAdmin && (
                     <button onClick={() => setIsEditing(true)} className="p-1.5 hover:bg-gray-800 text-gray-400 hover:text-blue-400 rounded-full transition-colors"><Pencil className="h-4 w-4" /></button>
                   )}
                 </div>

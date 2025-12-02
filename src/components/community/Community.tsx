@@ -8,6 +8,7 @@ import { formatTime } from '../../utils/format';
 import { t } from '../../data/constants';
 import { ConfirmationModal } from '../ui/ConfirmationModal';
 import { Modal } from '../ui/Modal';
+import { ADMIN_ID } from '../../context/AuthContext'; // [CAMBIO] Import
 
 // Interfaz de Props
 interface CommunityProps {
@@ -107,20 +108,10 @@ const useCommunityLogic = (user: User | null, forcedUser?: User, readOnly?: bool
       read: true // El mensaje propio nace leído
     };
     
-    // IMPORTANTE: Si es mensaje privado, necesitamos crear la copia "no leída" para el destinatario
-    // Pero como compartimos el array de mensajes, basta con asegurarnos que el filtro de "read" funcione bien.
-    // En este modelo simplificado de chat local, el mensaje se guarda una sola vez.
-    // Para simular que el OTRO no lo ha leído, deberíamos marcarlo como read: false si soy el sender.
-    // Pero la lógica de visualización actual asume que si yo lo envié, está leído.
-    // Ajuste: Para que el OTRO vea la notificación, el mensaje debe tener read: false.
-    // Como compartimos DB, si pongo read: false, yo lo veré no leído también.
-    // Solución: El campo `read` debería ser un array de IDs de quienes lo leyeron, o simplificar:
-    // El mensaje nace `read: false`. Si soy el sender, lo veo normal. Si soy el recipient, lo veo como no leído hasta que entro al chat.
-    
     if (selectedUser) {
-        newMessage.read = false; // Mensaje privado nace NO LEÍDO
+        newMessage.read = false; 
     } else {
-        newMessage.read = true; // Mensaje público nace leído (simplificación)
+        newMessage.read = true; 
     }
 
     setMessages(prev => [...prev, newMessage]);
@@ -395,8 +386,13 @@ const CommunityModals: React.FC<{
   isBanOpen: boolean,
   alertInfo: any,
   isUserBanned: (id: string) => boolean,
+  currentUser: User | null, // [CAMBIO] Añadimos currentUser a los props
   actions: any
-}> = ({ userToDelete, userToBlock, viewingUser, isBanOpen, alertInfo, isUserBanned, actions }) => {
+}> = ({ userToDelete, userToBlock, viewingUser, isBanOpen, alertInfo, isUserBanned, currentUser, actions }) => {
+  
+  // [CAMBIO] Verificación de admin dentro del modal
+  const isAdmin = currentUser?.id === ADMIN_ID;
+
   return (
     <>
       <ConfirmationModal isOpen={!!userToDelete} onClose={() => actions.setMessageToDelete(null)} onConfirm={actions.confirmDeleteMessage} title="Eliminar Mensaje" message="¿Eliminar mensaje?" />
@@ -421,11 +417,18 @@ const CommunityModals: React.FC<{
                 <Button onClick={actions.handleViewCollection} variant="secondary" className="flex-1 bg-gray-800 border-gray-700 text-gray-200"><Eye className="h-4 w-4 mr-2" /> Ver Colección</Button>
               </div>
               <div className="flex gap-3">
-                <Button onClick={actions.handleViewHistory} variant="secondary" className="flex-1 bg-gray-800 border-gray-700 text-gray-200"><History className="h-4 w-4 mr-2" /> Historial</Button>
-                {isUserBanned(viewingUser.id) ? (
-                  <Button onClick={actions.handleBanClick} className="flex-1 bg-green-600 text-white border border-green-800"><CheckCircle className="h-4 w-4 mr-2" /> Desbanear</Button>
-                ) : (
-                  <Button onClick={actions.handleBanClick} variant="destructive" className="flex-1 bg-red-900/50 border-red-800 text-red-200"><Ban className="h-4 w-4 mr-2" /> Bannear</Button>
+                {/* [CAMBIO] Solo mostramos Historial si es Admin */}
+                {isAdmin && (
+                  <Button onClick={actions.handleViewHistory} variant="secondary" className="flex-1 bg-gray-800 border-gray-700 text-gray-200"><History className="h-4 w-4 mr-2" /> Historial</Button>
+                )}
+                
+                {/* [CAMBIO] Solo mostramos Banear/Desbanear si es Admin */}
+                {isAdmin && (
+                  isUserBanned(viewingUser.id) ? (
+                    <Button onClick={actions.handleBanClick} className="flex-1 bg-green-600 text-white border border-green-800"><CheckCircle className="h-4 w-4 mr-2" /> Desbanear</Button>
+                  ) : (
+                    <Button onClick={actions.handleBanClick} variant="destructive" className="flex-1 bg-red-900/50 border-red-800 text-red-200"><Ban className="h-4 w-4 mr-2" /> Bannear</Button>
+                  )
                 )}
               </div>
             </div>
@@ -530,6 +533,7 @@ export const Community: React.FC<CommunityProps> = ({ onViewCollection, onViewHi
         isBanOpen={isBanDurationModalOpen}
         alertInfo={state.alertInfo}
         isUserBanned={state.isUserBanned}
+        currentUser={currentUser} // [CAMBIO] Pasamos currentUser para validar admin
         actions={uiActions}
       />
     </div>

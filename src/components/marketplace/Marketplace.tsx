@@ -11,6 +11,7 @@ import { Toast } from '../ui/Toast';
 import { CardFilters } from '../cards/CardFilters';
 import { formatCLP } from '../../utils/format';
 import { t } from '../../data/constants';
+import { ADMIN_ID } from '../../context/AuthContext'; // [CAMBIO] Import
 
 interface MarketplaceProps {
   listings: MarketplaceListing[];
@@ -49,7 +50,6 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ listings, onAddListing
   });
 
   const handleBuyCard = (listing: MarketplaceListing) => {
-    // Evitar comprar tus propias cartas
     if (user?.id === listing.seller.id) {
       alert("No puedes comprar tus propias cartas.");
       return;
@@ -123,6 +123,8 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ listings, onAddListing
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredListings.map((listing) => {
           const isMyListing = user?.id === listing.seller.id;
+          // [CAMBIO] Definimos quién puede borrar: dueño o admin
+          const canDelete = isMyListing || user?.id === ADMIN_ID;
 
           return (
             <div key={listing.id} className="bg-gray-900 rounded-xl shadow-lg border border-gray-800 overflow-hidden hover:shadow-2xl transition-all hover:border-gray-700 group">
@@ -134,12 +136,12 @@ export const Marketplace: React.FC<MarketplaceProps> = ({ listings, onAddListing
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-80" />
                 
-                {/* BOTÓN DE ELIMINAR (Ahora visible en TODAS las publicaciones) */}
-                {onRemoveListing && (
+                {/* [CAMBIO] Condicionamos la visibilidad del botón eliminar */}
+                {onRemoveListing && canDelete && (
                   <button
                     className="absolute top-2 left-2 z-20 p-2 bg-red-600/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-lg hover:bg-red-700 hover:scale-110"
                     onClick={(e) => {
-                      e.stopPropagation(); // Evitar abrir detalles
+                      e.stopPropagation();
                       onRemoveListing(listing.id);
                     }}
                     title="Eliminar publicación"
