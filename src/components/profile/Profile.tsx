@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { User as UserIcon, Mail, Calendar, Shield, Package, Lock, Unlock, CheckCircle, AlertCircle, X, Camera } from 'lucide-react';
+import { User as UserIcon, Mail, Calendar, Shield, Package, Lock, Unlock, CheckCircle, AlertCircle, X, Camera, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useCollection } from '../../hooks/useCollection';
 import { Button } from '../ui/Button';
@@ -7,12 +7,10 @@ import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 
 export const Profile: React.FC = () => {
-  // Ahora destructuramos también updateUser
-  const { user, changePassword, updateUser } = useAuth();
+  const { user, changePassword, updateUser, deleteAccount } = useAuth();
   const { getCollectionStats } = useCollection(user?.id);
   const stats = getCollectionStats();
   
-  // Referencia para el input de archivo oculto
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados para Cambiar Contraseña
@@ -25,6 +23,9 @@ export const Profile: React.FC = () => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [revealInput, setRevealInput] = useState('');
   const [revealError, setRevealError] = useState('');
+  
+  // Estado para Eliminar Cuenta
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
 
@@ -45,7 +46,6 @@ export const Profile: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        // Actualizamos el usuario en el contexto y localStorage
         updateUser({ avatar: reader.result as string });
       };
       reader.readAsDataURL(file);
@@ -107,6 +107,20 @@ export const Profile: React.FC = () => {
     }
   };
 
+  // --- LÓGICA ELIMINAR CUENTA ---
+  const handleDeleteAccount = async () => {
+      setIsLoading(true);
+      // Usamos el ID del usuario actual para solicitar su propio borrado
+      const result = await deleteAccount(user.id);
+      
+      if (!result.success) {
+          alert(result.message);
+          setIsLoading(false);
+          setIsDeleteModalOpen(false);
+      }
+      // Si es exitoso, el AuthContext manejará el logout automáticamente
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-3xl font-bold text-gray-100 mb-8">Mi Perfil</h1>
@@ -130,15 +144,12 @@ export const Profile: React.FC = () => {
                 </div>
               )}
               
-              {/* Overlay de cámara al hacer hover */}
               <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <Camera className="w-10 h-10 text-white drop-shadow-md" />
               </div>
 
-              {/* Indicador de estado online */}
               <div className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-gray-900 ${user.isOnline ? 'bg-green-500' : 'bg-gray-500'}`}></div>
               
-              {/* Input oculto */}
               <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -221,6 +232,25 @@ export const Profile: React.FC = () => {
                   Cambiar
                 </Button>
               </div>
+
+              {/* SECCIÓN ELIMINAR CUENTA (Cambio Solicitado) */}
+              <div className="mt-6 pt-6 border-t border-gray-800">
+                 <h4 className="text-sm font-bold text-red-400 mb-2 flex items-center">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar cuenta
+                 </h4>
+                 <p className="text-xs text-gray-500 mb-3">
+                    Si eliminas tu cuenta, perderás acceso a tu colección y datos de forma permanente.
+                 </p>
+                 <Button 
+                    variant="destructive"
+                    className="w-full bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-900/50"
+                    onClick={() => setIsDeleteModalOpen(true)}
+                 >
+                    Eliminar mi cuenta
+                 </Button>
+              </div>
+
             </div>
           </div>
 
@@ -337,6 +367,40 @@ export const Profile: React.FC = () => {
               <Button type="submit" loading={isLoading} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20">Actualizar</Button>
             </div>
           </form>
+        </div>
+      </Modal>
+
+      {/* MODAL 3: CONFIRMACIÓN DE ELIMINAR CUENTA */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        className="max-w-sm !bg-gray-900 border border-red-900/50"
+        showCloseButton={false}
+      >
+        <div className="p-6 text-center">
+           <div className="w-12 h-12 rounded-full bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="h-6 w-6 text-red-500" />
+           </div>
+           <h2 className="text-xl font-bold text-white mb-2">¿Estás seguro?</h2>
+           <p className="text-sm text-gray-400 mb-6">
+              Esta acción no se puede deshacer. Tu cuenta será eliminada permanentemente.
+           </p>
+           <div className="flex gap-3">
+              <Button 
+                variant="secondary" 
+                onClick={() => setIsDeleteModalOpen(false)} 
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                loading={isLoading}
+                onClick={handleDeleteAccount}
+              >
+                Sí, eliminar
+              </Button>
+           </div>
         </div>
       </Modal>
     </div>

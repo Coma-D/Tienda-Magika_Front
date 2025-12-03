@@ -15,6 +15,8 @@ interface CollectionProps {
   isOwner?: boolean;
   userName?: string;
   onBack?: () => void;
+  // NUEVO PROP: Función para navegar al catálogo
+  onNavigateToCatalog?: () => void;
 }
 
 export const Collection: React.FC<CollectionProps> = ({ 
@@ -22,7 +24,8 @@ export const Collection: React.FC<CollectionProps> = ({
   collection, 
   isOwner = true, 
   userName,
-  onBack
+  onBack,
+  onNavigateToCatalog 
 }) => {
   const { 
     cards, toggleFavorite, getCollectionStats, addToCollection, 
@@ -83,10 +86,9 @@ export const Collection: React.FC<CollectionProps> = ({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-10">
         
-        {/* --- CABECERA DE COLECCIÓN REDISEÑADA --- */}
+        {/* --- CABECERA DE COLECCIÓN --- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div className="flex items-center gap-5">
-            {/* Botón Volver (solo si no es owner) */}
             {!isOwner && onBack && (
               <button 
                 onClick={onBack} 
@@ -97,7 +99,6 @@ export const Collection: React.FC<CollectionProps> = ({
               </button>
             )}
             
-            {/* Títulos y Subtítulos */}
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-md border ${isOwner ? 'bg-blue-900/30 text-blue-400 border-blue-800' : 'bg-purple-900/30 text-purple-400 border-purple-800'}`}>
@@ -105,19 +106,16 @@ export const Collection: React.FC<CollectionProps> = ({
                 </span>
               </div>
               
-              {/* TÍTULO PRINCIPAL: CAMBIO APLICADO AQUÍ */}
               <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight flex items-center gap-2">
                 {isOwner ? (
                   'Mi Colección'
                 ) : (
-                  /* Texto de exploración como título principal */
                   <span className="text-2xl md:text-3xl font-bold">
                     Explorando el inventario público de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">{userName}</span>
                   </span>
                 )}
               </h1>
               
-              {/* SUBTÍTULO: Solo se muestra si es el dueño (para instrucciones) */}
               {isOwner && (
                 <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
                   Gestiona y organiza tu inventario personal de cartas Magic
@@ -126,7 +124,6 @@ export const Collection: React.FC<CollectionProps> = ({
             </div>
           </div>
           
-          {/* Botón Añadir (Solo si es owner) */}
           {isOwner && (
             <Button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20 font-bold h-12 px-6 rounded-xl">
               <Plus className="h-5 w-5 mr-2" /> Añadir Carta Propia
@@ -199,7 +196,13 @@ export const Collection: React.FC<CollectionProps> = ({
             </p>
             {isOwner && !showFavoritesOnly && (
               <div className="flex gap-4">
-                <Button onClick={() => window.location.href = '/'} className="bg-gray-800 hover:bg-gray-700 text-white font-bold px-6 py-3 rounded-lg border border-gray-700">Ir al Catálogo</Button>
+                {/* CAMBIO: Uso de prop onNavigateToCatalog */}
+                <Button 
+                  onClick={onNavigateToCatalog} 
+                  className="bg-gray-800 hover:bg-gray-700 text-white font-bold px-6 py-3 rounded-lg border border-gray-700"
+                >
+                  Ir al Catálogo
+                </Button>
                 <Button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-lg shadow-lg shadow-blue-900/20"><Plus className="h-5 w-5 mr-2" /> Añadir Manualmente</Button>
               </div>
             )}

@@ -19,7 +19,7 @@ import { PublicCollection } from './components/collection/PublicCollection';
 import { useAuth } from './hooks/useAuth';
 import { useCart } from './hooks/useCart';
 import { useCollection } from './hooks/useCollection';
-import { useInitialData } from './hooks/useInitialData'; // [NUEVO] Hook
+import { useInitialData } from './hooks/useInitialData';
 import { useNotification } from './hooks/useNotification';
 import { Card, MarketplaceListing, CartItem, User } from './types';
 import { ConfirmationModal } from './components/ui/ConfirmationModal';
@@ -34,14 +34,12 @@ function App() {
   const collection = useCollection(user?.id);
   const { addNotification } = useNotification();
   
-  // [REFACTOR] Usamos el hook para toda la data inicial
   const { 
     catalogCards, setCatalogCards, 
     marketplaceListings, setMarketplaceListings, 
     availableSets, setAvailableSets 
   } = useInitialData();
 
-  // Estados de Navegación
   const [viewingProfileUser, setViewingProfileUser] = useState<User | null>(null);
   const [viewingHistoryUser, setViewingHistoryUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>(() => {
@@ -52,19 +50,16 @@ function App() {
   const [authView, setAuthView] = useState<AuthView>('login');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Estados de Interfaz
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [isAddCardModalOpen, setIsAddCardModalOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void; }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-  // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRarity, setSelectedRarity] = useState('Todas');
   const [selectedColor, setSelectedColor] = useState('Todos');
   const [selectedType, setSelectedType] = useState('Todos');
   const [selectedSet, setSelectedSet] = useState('Todos');
 
-  // Efectos
   useEffect(() => {
     if (isAuthenticated) localStorage.setItem('lastView', currentView);
     else setAuthView('login');
@@ -76,7 +71,6 @@ function App() {
     }
   }, [catalogCards, isAuthenticated]);
 
-  // Handlers
   const openConfirmation = (title: string, message: string, action: () => void) => {
     setConfirmModal({ isOpen: true, title, message, onConfirm: action });
   };
@@ -172,7 +166,11 @@ function App() {
         {currentView === 'catalog' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="relative rounded-2xl bg-gradient-to-r from-gray-900 to-black p-8 mb-10 text-gray-100 shadow-2xl overflow-hidden border border-gray-800">
-              <div className="relative z-10"><h1 className="text-4xl font-extrabold mb-4 text-white">Explora el Multiverso</h1><p className="text-gray-400 text-lg">Encuentra las cartas más raras.</p></div>
+              <div className="relative z-10">
+                <h1 className="text-4xl font-extrabold mb-4 text-white">Explora el Multiverso</h1>
+                <p className="text-gray-400 text-lg mb-6">Encuentra las cartas más raras.</p>
+                {/* ELIMINADO: Botón de "Ir a Catálogo" aquí */}
+              </div>
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-900/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
             </div>
             <CardFilters
@@ -196,7 +194,16 @@ function App() {
             <AddCardForm isOpen={isAddCardModalOpen} onClose={() => setIsAddCardModalOpen(false)} onAdd={handleAddNewCard} availableSets={availableSets} onAddSet={handleAddSet} onDeleteSet={handleDeleteSet} />
           </div>
         )}
-        {currentView === 'collection' && <Collection catalogSets={availableSets} collection={collection} />}
+        
+        {/* MODIFICADO: Se pasa la función onNavigateToCatalog */}
+        {currentView === 'collection' && (
+            <Collection 
+                catalogSets={availableSets} 
+                collection={collection} 
+                onNavigateToCatalog={() => setCurrentView('catalog')}
+            />
+        )}
+        
         {currentView === 'other-collection' && viewingProfileUser && <PublicCollection userId={viewingProfileUser.id} userName={viewingProfileUser.username} onBack={() => setCurrentView('community')} availableSets={availableSets} />}
         {currentView === 'user-history' && viewingHistoryUser && <Community forcedUser={viewingHistoryUser} readOnly={true} onBack={() => setCurrentView('community')} onViewCollection={(u) => { setViewingProfileUser(u); setCurrentView('other-collection'); }} />}
         {currentView === 'marketplace' && <Marketplace listings={marketplaceListings} onAddListing={handleAddListing} onRemoveListing={handleRemoveListing} availableSets={availableSets} />}

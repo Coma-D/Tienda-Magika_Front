@@ -18,15 +18,12 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onToggl
   const { notifications, markAsRead } = useNotification();
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // FILTRO SIMPLE: Solo mis notificaciones
-  // Como el admin ahora es '1', y los tickets van a '1', esto funcionará nativamente
   const myNotifications = notifications.filter(n => n.userId === user?.id);
   const myUnreadCount = myNotifications.filter(n => !n.read).length;
 
   const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  const handleLogout = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleLogout = () => {
     logout();
     onNavigate('auth');
   };
@@ -76,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onToggl
             ))}
           </nav>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             <div className="relative">
               <button 
                 onClick={() => setShowNotifications(!showNotifications)} 
@@ -100,14 +97,24 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onNavigate, onToggl
               {cartItemCount > 0 && <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center border border-gray-900 shadow-sm">{cartItemCount}</span>}
             </button>
 
-            <div 
-              className="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 p-1.5 rounded-lg transition-colors group"
-              onClick={() => onNavigate('profile')}
-              title="Ir a mi perfil"
-            >
-              <img src={user?.avatar} alt={user?.username} className="h-8 w-8 rounded-full border border-gray-700 group-hover:border-blue-500 transition-colors object-cover" />
-              <span className="hidden sm:block text-sm font-medium text-gray-300 group-hover:text-white">{user?.username}</span>
-              <button onClick={handleLogout} className="p-2 hover:bg-red-900/30 rounded-lg transition-colors text-gray-400 hover:text-red-400 ml-2" title="Cerrar sesión">
+            {/* CORREGIDO: Separar el botón de perfil del botón de logout para evitar conflictos de clic */}
+            <div className="flex items-center ml-2 gap-2">
+              <div 
+                className="flex items-center gap-2 cursor-pointer hover:bg-gray-800 p-1.5 rounded-lg transition-colors group"
+                onClick={() => onNavigate('profile')}
+                title="Ir a mi perfil"
+              >
+                <img src={user?.avatar} alt={user?.username} className="h-8 w-8 rounded-full border border-gray-700 group-hover:border-blue-500 transition-colors object-cover" />
+                <span className="hidden sm:block text-sm font-medium text-gray-300 group-hover:text-white">{user?.username}</span>
+              </div>
+              
+              <div className="h-6 w-px bg-gray-700 mx-1"></div>
+
+              <button 
+                onClick={handleLogout} 
+                className="p-2 hover:bg-red-900/30 rounded-lg transition-colors text-gray-400 hover:text-red-400" 
+                title="Cerrar sesión"
+              >
                 <LogOut className="h-4 w-4" />
               </button>
             </div>
