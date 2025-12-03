@@ -32,7 +32,8 @@ export const Collection: React.FC<CollectionProps> = ({
     removeQuantityFromCollection, updateCollectionCard 
   } = collection;
 
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  // CAMBIO 1: El estado usa CollectionCard para ser compatible con el hook y CardDetail
+  const [selectedCard, setSelectedCard] = useState<CollectionCard | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [deletingCard, setDeletingCard] = useState<CollectionCard | null>(null);
@@ -229,7 +230,8 @@ export const Collection: React.FC<CollectionProps> = ({
       <CardDetail
         card={selectedCard} isOpen={!!selectedCard} onClose={() => setSelectedCard(null)}
         onAddToCollection={isOwner ? addToCollection : undefined} 
-        onEditCard={isOwner ? updateCollectionCard : undefined}
+        // CAMBIO 2: Wrapper de casteo para pasar de Card a CollectionCard y resolver el error
+        onEditCard={isOwner ? (card) => updateCollectionCard(card as CollectionCard) : undefined}
         onDeleteCard={isOwner ? () => selectedCard && initiateDelete(selectedCard as CollectionCard) : undefined}
         availableSets={catalogSets}
       />
